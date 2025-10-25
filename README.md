@@ -8,23 +8,22 @@
 
 ## 📜 Descripción
 
-**KipuBank** es un contrato inteligente desarrollado en Solidity que simula el funcionamiento de un banco descentralizado donde los usuarios pueden **depositar** y **retirar** ETH (tokens nativos de Ethereum).  
-Cada usuario tiene su propia **cuenta personal**, y el sistema aplica:
+**KipuBank** es un contrato inteligente desarrollado en **Solidity** que simula el funcionamiento de un **banco descentralizado**, donde los usuarios pueden **depositar** y **retirar** ETH de sus cuentas personales.
 
-- Un **límite máximo de retiro por transacción**, definido como `i_withdrawLimit`.
-- Un **límite global de fondos del banco**, definido como `i_bankCap`.
+Esta versión mejora la funcionalidad del contrato original incorporando:
 
-El contrato también lleva un registro de:
+- Un **oráculo Chainlink** para consultar el precio actual de ETH/USD.
+- **Historial de transacciones** por usuario (depósitos y retiros).
+- **Conversión de unidades** entre wei ↔ ether y entre ETH ↔ USD.
+- **Control de propietario**, con funciones exclusivas de administración.
+- Mecanismo de **seguridad contra reentrancia**.
 
-- La cantidad total de **depósitos** y **retiros** exitosos.
-- El **saldo total del banco**.
-- El **saldo individual** de cada usuario.
+Cada usuario tiene su **bóveda personal**, y el contrato mantiene:
 
-Este contrato fue diseñado siguiendo las mejores prácticas de seguridad:
-
-- Patrón **checks-effects-interactions**.
-- Implementación de **reentrancy guard** para prevenir ataques.
-- Buenas prácticas de legibilidad, comentarios NatSpec y errores personalizados.
+- Límite máximo de retiro por transacción (`i_withdrawLimit`).
+- Límite global de fondos del banco (`i_bankCap`).
+- Contadores globales de depósitos y retiros.
+- Registro detallado de todas las operaciones.
 
 > ⚠️ **Nota:** Este proyecto es de propósito educativo. No debe usarse en entornos de producción ni para manejo de fondos reales.
 
@@ -34,19 +33,46 @@ Este contrato fue diseñado siguiendo las mejores prácticas de seguridad:
 
 ### 1. Depósitos (`deposit`)
 
-Permite al usuario enviar ETH al contrato, incrementando su saldo personal y el saldo global del banco.  
+Permite enviar ETH al contrato para aumentar el saldo personal del usuario.  
 Si el nuevo total supera el límite global (`bankCap`), la operación revierte.
+
+- Incrementa el contador global de depósitos.
+- Guarda la transacción en el historial personal (`s_userTxHistory`).
+- Emite el evento `DepositPerformed`.
 
 ### 2. Retiros (`withdraw`)
 
 Permite retirar ETH desde la bóveda personal, respetando:
 
-- El límite de retiro por transacción.
+- El límite máximo de retiro (`i_withdrawLimit`).
 - El saldo disponible del usuario.
+
+- Disminuye el saldo global y personal.
+- Registra la transacción en el historial.
+- Emite el evento `WithdrawalPerformed`.
+- Protegido por `nonReentrant`.
 
 ### 3. Consulta de saldo (`getVaultBalance`)
 
-Función `view` que devuelve el saldo actual de cualquier usuario.
+Devuelve el saldo actual de un usuario específico.
+
+### 4. Valor de depósito en USD (`getDepositValueInUSD`)
+
+Convierte un monto de ETH a su equivalente en USD usando el **oráculo Chainlink** configurado.
+
+### 5. Normalización de decimales (`normalizeDecimals`)
+
+Convierte montos entre diferentes precisiones decimales, útil para interoperabilidad con tokens o feeds de precios.
+
+### 6. Conversión de unidades
+
+- `convertToEth(uint256 amountWei)` → Convierte wei → ether
+- `convertFromEth(uint256 amountEth)` → Convierte ether → wei
+
+### 7. Funciones administrativas
+
+- `changeOwner(address newOwner)` → Cambia el dueño del contrato.
+- `updateOracle(address newOracle)` → Actualiza la dirección del oráculo Chainlink.
 
 ---
 
@@ -55,41 +81,30 @@ Función `view` que devuelve el saldo actual de cualquier usuario.
 - **Reentrancy Guard:** Protege las funciones sensibles de ataques de reentrada.
 - **Errores personalizados:** Proporcionan diagnósticos más claros y ahorro de gas.
 - **Checks-Effects-Interactions:** Garantiza ejecución segura en todas las operaciones con ETH.
+- **Acceso restringido:** funciones administrativas protegidas con `onlyOwner`.Para desplegar **KipuBank** en **Remix** utilizando **Sepolia Testnet**:
 
----
-
-## ⚙️ Instrucciones de despliegue
-
-Para desplegar el contrato KipuBank en Remix utilizando Sepolia Testnet:
-
-1. Abrí MetaMask y seleccioná la red Sepolia Test Network.
-
-2 En Remix, en el panel Deploy & Run Transactions, elegí Injected Provider - MetaMask como Environment.
-
-3. Cargá el contrato KipuBank.sol en Remix.
-
-4. En el constructor, definí los parámetros:
-
-5. \_withdrawLimit: límite máximo de retiro por transacción (en wei o ether).
-
-6. \_bankCap: límite global del banco (en wei o ether).
-
-7. Hacé click en Deploy y confirmá la transacción en MetaMask.
-
-8. Una vez confirmada, copiá la dirección del contrato desplegado.
-
-9. Podés verificarlo en Etherscan (Sepolia) usando la dirección copiada.
+1. Abrí **MetaMask** y seleccioná la red **Sepolia Test Network**.
+2. En Remix, seleccioná **Injected Provider - MetaMask** como _Environment_.
+3. Cargá el archivo `KipuBank.sol` desde la carpeta `src/`.
+4. En el constructor, completá los parámetros:
+   - `_withdrawLimit`: límite máximo de retiro por transacción (wei o ether).
+   - `_bankCap`: límite global de depósitos del banco.
+   - `_oracleAddress`: dirección del oráculo Chainlink ETH/USD (Sepolia).
+5. Hacé clic en **Deploy** y confirmá en MetaMask.
+6. Una vez confirmada, copiá la dirección del contrato desplegado.
+7. Verificalo en **Etherscan (Sepolia)** usando esa dirección.
 
 ## 🚀 Despliegue de prueba
 
 Una versión de prueba del contrato está desplegada en la red **Sepolia Testnet**:
 
-👉 [Ver en Etherscan](https://sepolia.etherscan.io/address/0xbc54d5132c75af0ed8744e377618a7ddf2f4f25f)
+👉 [Ver en Etherscan](https://sepolia.etherscan.io/address/0x3e2C6428e6e52ae25c62Ad266c8874AC9BC7441d)
 
 ### Parámetros de despliegue:
 
 - **Límite máximo por retiro:** `1 ether`
 - **Límite global del banco:** `100 ether`
+- **Oráculo Chainlink (ETH/USD):** `0x694AA1769357215DE4FAC081bf1f309aDC325306`
 
 ---
 
@@ -111,6 +126,12 @@ KipuBank.withdraw(0.5 ether);
 
 ```solidity
 KipuBank.getVaultBalance(msg.sender);
+```
+
+### Valor estimado en USD
+
+```solidity
+KipuBank.getDepositValueInUSD(1 ether);
 ```
 
 ---
